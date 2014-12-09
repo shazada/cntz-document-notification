@@ -1,0 +1,25 @@
+<alfresco-config>
+	<config evaluator="string-compare" condition="DocLibActions">
+		<actions>
+			<action id="cntz-notify-action" icon="notify" type="javascript" label="actions.document.notify">
+				<permissions>
+					<permission allow="true">Write</permission>
+				</permissions>
+				<evaluator negate="true">evaluator.doclib.action.isLocked</evaluator>
+				<param name="function">notifyAction</param>
+			</action>
+		</actions>
+		<actionGroups>
+			<actionGroup id="document-details">
+				<action index="600" id="cntz-notify-action" />
+			</actionGroup>
+		</actionGroups>
+	</config>
+	
+	<config evaluator="string-compare" condition="DocLibCustom">
+		<dependencies>
+			<js src="components/documentlibrary/notify-action.js" />
+		</dependencies>
+	</config>
+
+</alfresco-config>

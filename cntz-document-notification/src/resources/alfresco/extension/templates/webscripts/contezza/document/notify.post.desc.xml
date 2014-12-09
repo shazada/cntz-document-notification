@@ -1,0 +1,8 @@
+<webscript>
+  <shortname>notify</shortname>
+  <description>Document List Action - Notify on changes</description>
+  <url>/contezza/document/notify/site/{site}/{container}?user={user}</url>
+  <format default="json">argument</format>
+  <authentication runas="admin">user</authentication>
+  <transaction>required</transaction>
+</webscript>

@@ -1,0 +1,154 @@
+<?xml version="1.0"?>
+
+<project name="cntz-document-notification" default="deploy" basedir=".">
+	<property file="build.properties" />
+
+	<!-- Build properties -->
+	<property name="project.dir" value="." />
+	<property name="dist.dir" value="${project.dir}/dist" />
+	<property name="bin.dir" value="${project.dir}/bin" />
+	<property name="web.dir" value="${project.dir}/src/webapp" />
+	<property name="sources.dir" value="${project.dir}/src/java" />
+	<property name="resources.dir" value="${project.dir}/src/resources" />
+	<property name="properties.dir" value="${project.dir}/src/properties" />
+	<property name="version" value="0.1.0" />
+	<property name="jar.name" value="${ant.project.name}-${version}.${sprint}.${build}" />
+	<property name="tomcat.dir" value="Tomcat Dir" />
+
+	<taskdef name="http" classname="org.missinglink.ant.task.http.HttpClientTask">
+	</taskdef>
+
+	<taskdef name="yuicompress" classname="net.noha.tools.ant.yuicompressor.tasks.YuiCompressorTask">
+	</taskdef>
+
+	<target name="increment">
+		<propertyfile file="build.properties">
+			<entry key="build" type="int" operation="+" default="0" />
+		</propertyfile>
+		<property file="build.properties" />
+		<echo message="Build number is ${version}${sprint}${build}" />
+	</target>
+
+	<target name="makeDirs">
+		<delete dir="${dist.dir}" />
+		<delete dir="${web.dir}" />
+		<delete dir="${resources.dir}" />
+		<delete dir="${properties.dir}" />
+		<mkdir dir="${dist.dir}" />
+		<mkdir dir="${web.dir}/themes" />
+		<mkdir dir="${resources.dir}/alfresco/extension/templates/webscripts" />
+		<mkdir dir="${resources.dir}/alfresco/web-extension/site-data" />
+		<mkdir dir="${resources.dir}/alfresco/web-extension/site-webscripts" />
+		<mkdir dir="${properties.dir}" />
+	</target>
+
+	<target name="checkforchanges">
+		<uptodate property="nochanges" targetfile="${tomcat_share.dir}/webapps/share">
+			<srcfiles dir="${web.dir}" includes="**/*.js" />
+			<mapper type="identity" />
+		</uptodate>
+	</target>
+
+	<!-- Minify JS -->
+	<target name="minify">
+		<yuicompress fromdir="${web.dir}" todir="${web.dir}" excludes="**/*-min.js,**/*.min.js" warn="${yuicompress.warn}">
+			<include name="**/*.js" />
+			<modified />
+		</yuicompress>
+	</target>
+
+	<!-- Deploy to Tomcat instance -->
+	<target name="deploy" depends="minify">
+		<copy todir="${tomcat_alfresco.dir}/shared/classes/alfresco/extension">
+			<fileset dir="${resources.dir}/alfresco/extension">
+				<include name="**" />
+			</fileset>
+		</copy>
+		<copy todir="${tomcat_share.dir}/shared/classes/alfresco/web-extension">
+			<fileset dir="${resources.dir}/alfresco/web-extension">
+				<include name="**" />
+			</fileset>
+		</copy>
+		<copy todir="${tomcat_share.dir}/webapps/share">
+			<fileset dir="${web.dir}">
+				<include name="**" />
+			</fileset>
+		</copy>
+		<copy todir="${tomcat_alfresco.dir}/webapps/alfresco/WEB-INF/classes">
+			<fileset dir="${bin.dir}">
+				<include name="**" />
+			</fileset>
+		</copy>
+	</target>
+
+	<!-- Clean folders and then deploy to Tomcat instance -->
+	<target name="clean-deploy">
+		<delete includeemptydirs="true">
+			<fileset dir="${tomcat_share.dir}/shared/classes/alfresco/web-extension">
+				<exclude name="**/*share-config-custom.xml" />
+			</fileset>
+			<fileset dir="${tomcat_alfresco.dir}/shared/classes/alfresco/extension">
+				<exclude name="custom*.properties" />
+				<exclude name="**/*.lic*" />
+			</fileset>
+			<fileset dir="${tomcat_share.dir}/webapps/share/extras" />
+		</delete>
+		<antcall target="deploy" />
+	</target>
+
+	<!-- Build the JAR file -->
+	<target name="dist-jar" depends="increment,minify" description="Build a JAR file containing configuration and resource files">
+		<jar destfile="${dist.dir}/${jar.name}-shared.jar">
+			<zipfileset dir="${web.dir}" prefix="META-INF" />
+			<fileset dir="${resources.dir}">
+				<exclude name="alfresco/web-extension/share-config-custom.xml" />
+				<exclude name="alfresco/extension/dev-log4j.properties" />
+			</fileset>
+		</jar>
+	</target>
+
+	<!-- Build the JAR file -->
+	<target name="dist-src-jar" depends="" description="Build a JAR file containing configuration and resource files">
+		<jar destfile="${dist.dir}/${jar.name}-src.jar">
+			<fileset dir="${bin.dir}" />
+			<modified />
+			<fileset dir="${resources.dir}">
+				<exclude name="alfresco/web-extension/share-config-custom.xml" />
+				<exclude name="alfresco/extension/dev-log4j.properties" />
+			</fileset>
+		</jar>
+	</target>
+
+	<target name="reload-webscripts-share" depends="deploy" description="Reload Share webscripts">
+		<http url="${share.scripts.index}" method="POST" printrequest="false" printrequestheaders="false" printresponse="false" printresponseheaders="false" expected="200" failonunexpected="true">
+			<credentials username="${repo.admin.username}" password="${repo.admin.password}" />
+			<query>
+				<parameter name="reset" value="on" />
+			</query>
+		</http>
+	</target>
+
+	<target name="scp" depends="minify">
+		<scp trust="true" todir="${server.login}:${tomcat_alfresco.dir}/shared/classes/alfresco/extension">
+			<fileset dir="${resources.dir}/alfresco/extension">
+				<include name="**" />
+			</fileset>
+		</scp>
+		<scp trust="true" todir="${server.login}:${tomcat_share.dir}/shared/classes/alfresco/web-extension">
+			<fileset dir="${resources.dir}/alfresco/web-extension">
+				<include name="**" />
+			</fileset>
+		</scp>
+		<scp trust="true" todir="${server.login}:${tomcat_share.dir}/webapps/share">
+			<fileset dir="${web.dir}">
+				<include name="**" />
+			</fileset>
+		</scp>
+		<scp trust="true" todir="${server.login}:${tomcat_alfresco.dir}/webapps/alfresco/WEB-INF/classes">
+			<fileset dir="${bin.dir}">
+				<include name="**" />
+			</fileset>
+		</scp>
+	</target>
+
+</project>
